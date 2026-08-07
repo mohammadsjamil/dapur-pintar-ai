@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DapurPintar AI - Asisten Kuliner & Pastry</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .animate-slide-up {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .touch-active:active {
+            transform: scale(0.96);
+            transition: transform 0.1s ease;
+        }
+    </style>
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col justify-between overflow-x-hidden transition-colors duration-300">
+
+    <!-- BAR ATAS (Header & Theme Toggle) -->
+    <header class="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3 transition-colors duration-300">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+                    <i data-lucide="utensils" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-base tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
+                        DapurPintar <span class="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/30 font-bold">PRO AI</span>
+                    </h1>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400">Masakan, Cake, Pastry & Dessert</p>
+                </div>
+            </div>
+
+            <!-- Header Actions -->
+            <div class="flex items-center space-x-2">
+                <!-- Mode Terang/Gelap Toggle -->
+                <button id="btn-theme-toggle" class="p-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all touch-active" title="Ubah Mode Layar">
+                    <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+                    <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+                </button>
+
+                <!-- Serverless Badge Indicator -->
+                <div class="px-2.5 py-1.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="hidden sm:inline">Server Active</span>
+                </div>
+            </div>
+        </div>
+    </header>
+    <!-- AREA KONTEN UTAMA (Scrollable) -->
+    <main class="flex-1 max-w-md mx-auto w-full px-4 pt-4 pb-28 space-y-5 overflow-y-auto no-scrollbar">
+
+        <!-- TAB 1: KULKAS & MERACIK -->
+        <section id="tab-content-ingredients" class="space-y-4">
+            
+            <!-- Banner Utama -->
+            <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 p-5 text-white shadow-xl shadow-orange-500/15">
+                <div class="relative z-10 space-y-1.5">
+                    <span class="inline-block px-2.5 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-extrabold tracking-wider uppercase">Maksimalkan Bahan Dapur</span>
+                    <h2 class="text-xl font-extrabold leading-tight">Mau Bikin Masakan atau Cake Hari Ini?</h2>
+                    <p class="text-xs text-orange-100 leading-relaxed">Pilih bahan yang ada, AI akan meracik kreasi masakan utama hingga kue & pastry manis!</p>
+                </div>
+                <i data-lucide="cake" class="absolute -right-2 -bottom-2 w-24 h-24 text-white/20 pointer-events-none"></i>
+            </div>
+
+            <!-- Kategori Jenis Olahan (Masakan vs Cake/Pastry) -->
+            <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Pilih Jenis Olahan Target:</label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="target-category-selector">
+                    <button class="target-cat-btn active p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all touch-active bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20" data-type="masakan">
+                        <i data-lucide="soup" class="w-5 h-5 mb-1"></i>
+                        <span class="text-xs font-bold">Masakan Utama</span>
+                    </button>
+                    <button class="target-cat-btn p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all touch-active bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800" data-type="pastry">
+                        <i data-lucide="cake" class="w-5 h-5 mb-1 text-pink-500"></i>
+                        <span class="text-xs font-bold">Cake & Pastry</span>
+                    </button>
+                    <button class="target-cat-btn p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all touch-active bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800" data-type="dessert">
+                        <i data-lucide="ice-cream" class="w-5 h-5 mb-1 text-cyan-500"></i>
+                        <span class="text-xs font-bold">Minuman & Dessert</span>
+                    </button>
+                    <button class="target-cat-btn p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all touch-active bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800" data-type="snack">
+                        <i data-lucide="cookie" class="w-5 h-5 mb-1 text-amber-500"></i>
+                        <span class="text-xs font-bold">Cemilan / Snack</span>
+                    </button>
+                </div>
+            </div>
+            <!-- Input Bahan Manual -->
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2 flex gap-2 shadow-sm transition-colors">
+                <div class="flex-1 flex items-center space-x-2 pl-3">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+                    <input type="text" id="input-ingredient" placeholder="Tambah bahan (contoh: Tepung Terigu, Mentega, Telur)..." class="w-full bg-transparent text-xs text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400">
+                </div>
+                <button id="btn-add-ingredient" class="px-3.5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1 touch-active shadow-md shadow-orange-500/20">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Tambah</span>
+                </button>
+            </div>
+
+            <!-- Chip Pilihan Cepat Berdasarkan Kategori -->
+            <div class="space-y-2.5">
+                <div class="flex items-center justify-between text-xs px-1">
+                    <span class="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                        Pilih Cepat Bahan Populer
+                    </span>
+                    <span class="text-[10px] text-slate-400">Ketuk untuk pilih</span>
+                </div>
+
+                <!-- Filter Sub Kategori Chips -->
+                <div class="flex space-x-1.5 overflow-x-auto no-scrollbar pb-1">
+                    <button class="chip-filter active px-3 py-1 rounded-xl text-[11px] font-bold bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/40 shrink-0" data-filter="semua">Semua</button>
+                    <button class="chip-filter px-3 py-1 rounded-xl text-[11px] font-medium bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 shrink-0" data-filter="baking">Baking & Tepung</button>
+                    <button class="chip-filter px-3 py-1 rounded-xl text-[11px] font-medium bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 shrink-0" data-filter="protein">Protein & Daging</button>
+                    <button class="chip-filter px-3 py-1 rounded-xl text-[11px] font-medium bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 shrink-0" data-filter="sayur">Sayur & Buah</button>
+                    <button class="chip-filter px-3 py-1 rounded-xl text-[11px] font-medium bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 shrink-0" data-filter="bumbu">Bumbu & Manis</button>
+                </div>
+
+                <!-- Wadah Chips -->
+                <div id="quick-chips-container" class="flex flex-wrap gap-1.5 pt-1"></div>
+            </div>
+
+            <!-- Wadah Bahan Terpilih -->
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm transition-colors">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+                        <h3 class="font-bold text-xs text-slate-800 dark:text-slate-200">Bahan Siap Diolah</h3>
+                        <span id="selected-count-badge" class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] text-orange-600 dark:text-orange-400 font-bold">0</span>
+                    </div>
+                    <button id="btn-clear-all" class="text-[11px] text-rose-500 hover:text-rose-600 font-semibold">Reset Semua</button>
+                </div>
+
+                <div id="selected-ingredients-tray" class="flex flex-wrap gap-1.5 min-h-[40px] items-center">
+                    <span class="text-xs text-slate-400 italic" id="empty-tray-msg">Belum ada bahan dipilih. Ketuk bahan di atas.</span>
+                </div>
+            </div>
+
+            <!-- Opsi Peralatan & Metode Memasak -->
+            <div class="grid grid-cols-2 gap-2.5">
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 space-y-1 shadow-sm">
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Peralatan Dapur</label>
+                    <select id="select-equipment" class="w-full bg-transparent text-xs font-bold text-orange-600 dark:text-orange-400 outline-none cursor-pointer">
+                        <option value="lengkap" class="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Lengkap (Oven/Mixer)</option>
+                        <option value="tanpa-oven" class="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Tanpa Oven (Kukus/Teblon)</option>
+                        <option value="tanpa-mixer" class="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Tanpa Mixer (Aduk Manual)</option>
+                        <option value="sederhana" class="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Alat Praktis Kos-kosan</option>
+                    </select>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 space-y-1 shadow-sm">
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Tingkat Kesulitan</label>
+                    <select id="select-level" class="w-full bg-transparent text-xs font-bold text-orange-600 dark:text-orange-400 outline-none cursor-pointer">
+                        <option value="pemula" selected class="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Pemula / Anti Gagal</option>
+                        <option value="sedang" class="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Sedang (Perlu Ketelitian)</option>
+                        <option value="mahir" class="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Mahir / Kualitas Bakery</option>
+                    </select>
+                </div>
+            </div>
+            <!-- Tombol Racik Resep Utama -->
+            <button id="btn-generate-recipe" class="w-full py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:opacity-95 active:scale-[0.98] text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center space-x-2 touch-active">
+                <i data-lucide="wand2" class="w-5 h-5"></i>
+                <span>Racik 3 Resep Kreatif AI</span>
+            </button>
+        </section>
+
+        <!-- TAB 2: HASIL RESEP (RECIPES) -->
+        <section id="tab-content-recipes" class="space-y-4 hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="font-extrabold text-base text-slate-900 dark:text-white">Rekomendasi Resep AI</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Variasi olahan paling maksimal dari bahanmu</p>
+                </div>
+                <span id="recipe-counter" class="px-2.5 py-1 bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 rounded-xl text-xs font-bold">0 Resep</span>
+            </div>
+
+            <!-- Placeholder Kosong -->
+            <div id="recipe-placeholder" class="bg-white dark:bg-slate-900/60 border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl p-8 text-center space-y-3">
+                <div class="w-14 h-14 bg-orange-50 dark:bg-slate-800 text-orange-500 dark:text-orange-400 rounded-2xl flex items-center justify-center mx-auto">
+                    <i data-lucide="cooking-pot" class="w-7 h-7"></i>
+                </div>
+                <h3 class="font-bold text-sm text-slate-800 dark:text-slate-200">Belum Ada Resep Diracik</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">Pilih bahan di menu Kulkas, pilih jenis olahan (Masakan/Cake), lalu tekan "Racik Resep Kreatif AI".</p>
+                <button onclick="switchTab('ingredients')" class="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-orange-600 dark:text-orange-400 font-bold text-xs rounded-xl border border-slate-200 dark:border-slate-700">
+                    + Pilih Bahan Sekarang
+                </button>
+            </div>
+
+            <!-- Loader Animasi -->
+            <div id="recipe-loader" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-10 text-center space-y-4 shadow-sm">
+                <div class="w-12 h-12 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mx-auto"></div>
+                <div>
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-slate-200">Koki AI Sedang Memformulasikan Resep...</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Menghitung takaran presisi & langkah anti-gagal</p>
+                </div>
+            </div>
+
+            <!-- Grid Kartu Resep -->
+            <div id="recipes-container" class="space-y-4 hidden"></div>
+        </section>
+
+        <!-- TAB 3: RESEP TERSIMPAN (BOOKMARK) -->
+        <section id="tab-content-saved" class="space-y-4 hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="font-bold text-base text-slate-900 dark:text-white">Resep Favorit Saya</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Resep tersimpan untuk dimasak nanti</p>
+                </div>
+                <button id="btn-clear-saved" class="text-xs text-rose-500 hover:underline font-semibold">Hapus Semua</button>
+            </div>
+
+            <div id="saved-recipes-container" class="space-y-3">
+                <p id="empty-saved-msg" class="text-xs text-slate-400 italic py-8 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
+                    Belum ada resep yang disimpan. Ketuk ikon bookmark di kartu resep untuk menyimpan.
+                </p>
+            </div>
+        </section>
+
+        <!-- TAB 4: DAFTAR BELANJA -->
+        <section id="tab-content-shopping" class="space-y-4 hidden">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 space-y-4 shadow-sm">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div>
+                        <h2 class="font-bold text-base text-slate-900 dark:text-white">Daftar Belanja Bahan</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Catatan bumbu / bahan yang belum ada</p>
+                    </div>
+                    <button id="btn-clear-shopping" class="text-xs text-rose-500 hover:underline font-semibold">Hapus Semua</button>
+                </div>
+
+                <div class="flex gap-2">
+                    <input type="text" id="input-shopping-item" placeholder="Contoh: Baking Powder, Vanili, Mentega..." class="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-200 outline-none focus:border-orange-500">
+                    <button id="btn-add-shopping" class="px-3.5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all">
+                        + Tambah
+                    </button>
+                </div>
+
+                <ul id="shopping-list-items" class="space-y-2 pt-1">
+                    <li id="empty-shopping-msg" class="text-xs text-slate-400 italic py-6 text-center">Belum ada catatan belanjaan.</li>
+                </ul>
+            </div>
+        </section>
+
+    </main>
+    <!-- NAVIGASI BAWAH MOBILE -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-3 py-2 transition-colors duration-300">
+        <div class="max-w-md mx-auto grid grid-cols-4 gap-1 text-center">
+            <button onclick="switchTab('ingredients')" id="nav-btn-ingredients" class="nav-btn active flex flex-col items-center justify-center py-1 text-orange-500 dark:text-orange-400 transition-all touch-active">
+                <i data-lucide="refrigerator" class="w-5 h-5 mb-0.5"></i>
+                <span class="text-[10px] font-bold">Kulkas</span>
+            </button>
+            <button onclick="switchTab('recipes')" id="nav-btn-recipes" class="nav-btn flex flex-col items-center justify-center py-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-all touch-active">
+                <i data-lucide="chef-hat" class="w-5 h-5 mb-0.5"></i>
+                <span class="text-[10px] font-semibold">Resep AI</span>
+            </button>
+            <button onclick="switchTab('saved')" id="nav-btn-saved" class="nav-btn flex flex-col items-center justify-center py-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-all touch-active">
+                <i data-lucide="bookmark" class="w-5 h-5 mb-0.5"></i>
+                <span class="text-[10px] font-semibold">Favorit</span>
+            </button>
+            <button onclick="switchTab('shopping')" id="nav-btn-shopping" class="nav-btn flex flex-col items-center justify-center py-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-all touch-active">
+                <i data-lucide="shopping-bag" class="w-5 h-5 mb-0.5"></i>
+                <span class="text-[10px] font-semibold">Belanja</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- MODAL MEMASAK INTERAKTIF (BOTTOM SHEET) -->
+    <div id="modal-cooking" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl animate-slide-up transition-colors">
+            
+            <!-- Header Modal -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
+                    <div>
+                        <span class="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">Mode Dapur Interaktif</span>
+                        <h3 id="modal-recipe-title" class="text-sm font-extrabold text-slate-900 dark:text-white truncate max-w-[240px]">Judul Resep</h3>
+                    </div>
+                </div>
+                <button id="btn-close-cooking" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Konten Modal -->
+            <div class="p-5 overflow-y-auto space-y-4 flex-1">
+                <!-- Meta Info Pill -->
+                <div class="flex items-center justify-between bg-slate-100 dark:bg-slate-950 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80 text-xs">
+                    <div class="flex items-center space-x-1.5 text-slate-700 dark:text-slate-300">
+                        <i data-lucide="clock" class="w-4 h-4 text-orange-500"></i>
+                        <span id="modal-time" class="font-bold">20 Mnt</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 text-slate-700 dark:text-slate-300">
+                        <i data-lucide="flame" class="w-4 h-4 text-emerald-500"></i>
+                        <span id="modal-calories" class="font-bold">320 Kal</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5 text-slate-700 dark:text-slate-300">
+                        <i data-lucide="bar-chart-2" class="w-4 h-4 text-amber-500"></i>
+                        <span id="modal-difficulty" class="font-bold">Pemula</span>
+                    </div>
+                </div>
+
+                <!-- Bahan Lengkap -->
+                <div class="bg-slate-50 dark:bg-slate-950/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
+                    <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Takaran & Bahan Lengkap:</h4>
+                    <ul id="modal-ingredients-list" class="grid grid-cols-2 gap-1.5 text-xs text-slate-700 dark:text-slate-300"></ul>
+                </div>
+
+                <!-- Substitusi Bahan Rekomendasi AI -->
+                <div id="modal-substitutions-box" class="hidden bg-amber-50 dark:bg-amber-950/30 p-3.5 rounded-2xl border border-amber-200 dark:border-amber-800/50 space-y-1">
+                    <h4 class="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                        <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i> Substitusi Alternatif:
+                    </h4>
+                    <p id="modal-substitutions-text" class="text-xs text-amber-800 dark:text-amber-300 leading-relaxed"></p>
+                </div>
+
+                <!-- Langkah Memasak Player -->
+                <div class="space-y-2.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-bold text-slate-800 dark:text-slate-200">Panduan Langkah Demi Langkah</span>
+                        <span id="step-counter-label" class="text-orange-600 dark:text-orange-400 font-bold">Langkah 1 dari 1</span>
+                    </div>
+
+                    <div class="p-4 bg-orange-500/10 border border-orange-500/30 rounded-2xl space-y-3">
+                        <p id="modal-step-text" class="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-relaxed min-h-[60px]">
+                            Instruksi memasak akan tampil di sini...
+                        </p>
+
+                        <!-- Control Toolbar Langkah -->
+                        <div class="flex items-center justify-between pt-2 border-t border-orange-500/20">
+                            <button id="btn-speak-step" class="px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 touch-active">
+                                <i data-lucide="volume-2" class="w-3.5 h-3.5 text-orange-500"></i>
+                                <span>Suara Asisten</span>
+                            </button>
+
+                            <div class="flex items-center space-x-2 bg-white dark:bg-slate-900 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                                <i data-lucide="timer" class="w-3.5 h-3.5 text-amber-500"></i>
+                                <span id="timer-display" class="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">00:00</span>
+                                <button id="btn-start-timer" class="text-[10px] bg-orange-500 hover:bg-orange-600 text-white px-2 py-0.5 rounded-lg font-bold">Timer 3m</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Modal Footer -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+                <button id="btn-prev-step" class="flex-1 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-all">
+                    &larr; Sebelum
+                </button>
+                <button id="btn-next-step" class="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl shadow-lg transition-all touch-active">
+                    Lanjut &rarr;
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-slate-900 text-white border border-orange-500/40 text-xs shadow-2xl transition-all duration-300 transform translate-y-10 opacity-0 pointer-events-none flex items-center space-x-2">
+        <i data-lucide="info" class="w-4 h-4 text-orange-400"></i>
+        <span id="toast-msg">Notifikasi</span>
+    </div>
+
+    <!-- JAVASCRIPT APP LOGIC -->
+    <script>
+        lucide.createIcons();
+
+        // Master List Bahan Populer Berdasarkan Kategori
+        const masterIngredients = [
+            // Baking & Pastry
+            { name: "Tepung Terigu", filter: "baking" },
+            { name: "Mentega / Margarin", filter: "baking" },
+            { name: "Gula Pasir", filter: "baking" },
+            { name: "Cokelat Bubuk / Batang", filter: "baking" },
+            { name: "Baking Powder / Soda", filter: "baking" },
+            { name: "Susu Cair / Bubuk", filter: "baking" },
+            { name: "Keju Parut", filter: "baking" },
+            { name: "Ragi Instan", filter: "baking" },
+            // Protein
+            { name: "Telur", filter: "protein" },
+            { name: "Ayam", filter: "protein" },
+            { name: "Daging Sapi", filter: "protein" },
+            { name: "Tahu", filter: "protein" },
+            { name: "Tempe", filter: "protein" },
+            { name: "Udang", filter: "protein" },
+            { name: "Ikan", filter: "protein" },
+            // Sayur & Buah
+            { name: "Pisang", filter: "sayur" },
+            { name: "Wortel", filter: "sayur" },
+            { name: "Kangkung", filter: "sayur" },
+            { name: "Tomat", filter: "sayur" },
+            { name: "Kentang", filter: "sayur" },
+            { name: "Stroberi / Buah", filter: "sayur" },
+            // Bumbu & Manis
+            { name: "Bawang Merah", filter: "bumbu" },
+            { name: "Bawang Putih", filter: "bumbu" },
+            { name: "Cabai Rawit", filter: "bumbu" },
+            { name: "Kecap Manis", filter: "bumbu" },
+            { name: "Madu", filter: "bumbu" },
+            { name: "Santan", filter: "bumbu" }
+        ];
+
+        // State Aplikasi
+        let selectedIngredients = ["Telur", "Tepung Terigu", "Mentega / Margarin", "Gula Pasir"];
+        let savedRecipes = JSON.parse(localStorage.getItem('dapur_saved_recipes') || '[]');
+        let shoppingItems = JSON.parse(localStorage.getItem('dapur_shopping_items') || '[]');
+        let generatedRecipes = [];
+        let currentRecipe = null;
+        let currentStepIndex = 0;
+        let timerInterval = null;
+        let selectedTargetType = "masakan"; // masakan, pastry, dessert, snack
+        let activeChipFilter = "semua";
+
+        // DOM Elements
+        const btnThemeToggle = document.getElementById('btn-theme-toggle');
+        const quickChipsContainer = document.getElementById('quick-chips-container');
+        const selectedIngredientsTray = document.getElementById('selected-ingredients-tray');
+        const emptyTrayMsg = document.getElementById('empty-tray-msg');
+        const selectedCountBadge = document.getElementById('selected-count-badge');
+        const inputIngredient = document.getElementById('input-ingredient');
+        const btnAddIngredient = document.getElementById('btn-add-ingredient');
+        const btnClearAll = document.getElementById('btn-clear-all');
+        const btnGenerateRecipe = document.getElementById('btn-generate-recipe');
+
+        const recipePlaceholder = document.getElementById('recipe-placeholder');
+        const recipeLoader = document.getElementById('recipe-loader');
+        const recipesContainer = document.getElementById('recipes-container');
+        const recipeCounter = document.getElementById('recipe-counter');
+
+        const savedRecipesContainer = document.getElementById('saved-recipes-container');
+        const emptySavedMsg = document.getElementById('empty-saved-msg');
+
+        const modalCooking = document.getElementById('modal-cooking');
+        const btnCloseCooking = document.getElementById('btn-close-cooking');
+        const modalRecipeTitle = document.getElementById('modal-recipe-title');
+        const modalTime = document.getElementById('modal-time');
+        const modalCalories = document.getElementById('modal-calories');
+        const modalDifficulty = document.getElementById('modal-difficulty');
+        const modalIngredientsList = document.getElementById('modal-ingredients-list');
+        const modalStepText = document.getElementById('modal-step-text');
+        const modalSubstitutionsBox = document.getElementById('modal-substitutions-box');
+        const modalSubstitutionsText = document.getElementById('modal-substitutions-text');
+        const stepCounterLabel = document.getElementById('step-counter-label');
+        const btnPrevStep = document.getElementById('btn-prev-step');
+        const btnNextStep = document.getElementById('btn-next-step');
+        const btnSpeakStep = document.getElementById('btn-speak-step');
+        const btnStartTimer = document.getElementById('btn-start-timer');
+        const timerDisplay = document.getElementById('timer-display');
+        /* ==========================================================================
+           1. TEMA TERANG / GELAP (DARK / LIGHT MODE)
+           ========================================================================== */
+        function initTheme() {
+            const savedTheme = localStorage.getItem('dapur_theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+
+        btnThemeToggle.addEventListener('click', () => {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('dapur_theme', 'light');
+                showToast("Mode Terang Aktif ☀️");
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('dapur_theme', 'dark');
+                showToast("Mode Gelap Aktif 🌙");
+            }
+            lucide.createIcons();
+        });
+
+        /* ==========================================================================
+           2. NAVIGASI TAB
+           ========================================================================== */
+        window.switchTab = function(tabName) {
+            const tabs = ['ingredients', 'recipes', 'saved', 'shopping'];
+            tabs.forEach(t => {
+                const content = document.getElementById(`tab-content-${t}`);
+                const btn = document.getElementById(`nav-btn-${t}`);
+                if (content && btn) {
+                    if (t === tabName) {
+                        content.classList.remove('hidden');
+                        btn.className = 'nav-btn active flex flex-col items-center justify-center py-1 text-orange-500 dark:text-orange-400 transition-all touch-active';
+                    } else {
+                        content.classList.add('hidden');
+                        btn.className = 'nav-btn flex flex-col items-center justify-center py-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-all touch-active';
+                    }
+                }
+            });
+            if (tabName === 'saved') renderSavedRecipes();
+        };
+
+        /* ==========================================================================
+           3. KELOLA CHIP & BAHAN KULKAS
+           ========================================================================== */
+        function renderChips() {
+            quickChipsContainer.innerHTML = '';
+            
+            const filtered = activeChipFilter === 'semua' 
+                ? masterIngredients 
+                : masterIngredients.filter(i => i.filter === activeChipFilter);
+
+            filtered.forEach(item => {
+                const isSelected = selectedIngredients.map(i => i.toLowerCase()).includes(item.name.toLowerCase());
+                const btn = document.createElement('button');
+                btn.className = `px-3 py-1.5 rounded-xl text-xs font-semibold transition-all touch-active ${
+                    isSelected 
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' 
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`;
+                btn.innerText = (isSelected ? '✓ ' : '+ ') + item.name;
+                btn.onclick = () => toggleIngredient(item.name);
+                quickChipsContainer.appendChild(btn);
+            });
+
+            // Render Tray Bahan Terpilih
+            selectedIngredientsTray.innerHTML = '';
+            selectedCountBadge.innerText = selectedIngredients.length;
+
+            if (selectedIngredients.length === 0) {
+                selectedIngredientsTray.appendChild(emptyTrayMsg);
+            } else {
+                selectedIngredients.forEach((name, index) => {
+                    const tag = document.createElement('span');
+                    tag.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-xs font-semibold';
+                    tag.innerHTML = `
+                        ${name}
+                        <button onclick="removeIngredient(${index})" class="hover:text-rose-500 font-bold text-sm ml-0.5">&times;</button>
+                    `;
+                    selectedIngredientsTray.appendChild(tag);
+                });
+            }
+        }
+        function toggleIngredient(name) {
+            const idx = selectedIngredients.findIndex(i => i.toLowerCase() === name.toLowerCase());
+            if (idx > -1) selectedIngredients.splice(idx, 1);
+            else selectedIngredients.push(name);
+            renderChips();
+        }
+
+        window.removeIngredient = function(index) {
+            selectedIngredients.splice(index, 1);
+            renderChips();
+        };
+
+        btnAddIngredient.addEventListener('click', () => {
+            const val = inputIngredient.value.trim();
+            if (val && !selectedIngredients.map(i => i.toLowerCase()).includes(val.toLowerCase())) {
+                selectedIngredients.push(val);
+                inputIngredient.value = '';
+                renderChips();
+            }
+        });
+
+        inputIngredient.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') btnAddIngredient.click();
+        });
+
+        btnClearAll.addEventListener('click', () => {
+            selectedIngredients = [];
+            renderChips();
+        });
+
+        // Selector Target Jenis Olahan (Masakan vs Pastry)
+        document.querySelectorAll('.target-cat-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.target-cat-btn').forEach(b => {
+                    b.className = 'target-cat-btn p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all touch-active bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800';
+                });
+                btn.className = 'target-cat-btn active p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all touch-active bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20';
+                selectedTargetType = btn.dataset.type;
+            });
+        });
+
+        // Filter Sub Chips
+        document.querySelectorAll('.chip-filter').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.chip-filter').forEach(t => {
+                    t.className = 'chip-filter px-3 py-1 rounded-xl text-[11px] font-medium bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 shrink-0';
+                });
+                tab.className = 'chip-filter active px-3 py-1 rounded-xl text-[11px] font-bold bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/40 shrink-0';
+                activeChipFilter = tab.dataset.filter;
+                renderChips();
+            });
+        });
+        /* ==========================================================================
+           4. PEMANGGILAN SERVERLESS BACKEND PROXY (GEMINI AI)
+           ========================================================================== */
+        async function fetchRecipesFromProxy() {
+            if (selectedIngredients.length === 0) {
+                showToast("Pilih minimal 1 bahan makanan!");
+                return;
+            }
+
+            const equipment = document.getElementById('select-equipment').value;
+            const level = document.getElementById('select-level').value;
+
+            switchTab('recipes');
+            recipePlaceholder.classList.add('hidden');
+            recipesContainer.classList.add('hidden');
+            recipeLoader.classList.remove('hidden');
+
+            try {
+                // Request dikirimkan ke serverless backend proxy
+                const response = await fetch('/api/generate-recipe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ingredients: selectedIngredients,
+                        targetType: selectedTargetType, // masakan / pastry / dessert / snack
+                        equipment: equipment,
+                        level: level
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error || `Error Server ${response.status}`);
+                }
+
+                const resultData = await response.json();
+                recipeLoader.classList.add('hidden');
+
+                if (Array.isArray(resultData) && resultData.length > 0) {
+                    generatedRecipes = resultData;
+                    renderRecipeCards(resultData);
+                } else {
+                    renderFallbackRecipes();
+                }
+            } catch (err) {
+                console.warn("Serverless backend belum dideploy atau offline, memakai fallback demo:", err);
+                recipeLoader.classList.add('hidden');
+                showToast("Mode Demo Offline (Deploy ke Vercel untuk AI Live)");
+                renderFallbackRecipes();
+            }
+        }
+
+        btnGenerateRecipe.addEventListener('click', fetchRecipesFromProxy);
+
+        function renderRecipeCards(recipes) {
+            recipesContainer.innerHTML = '';
+            recipeCounter.innerText = `${recipes.length} Resep Siap`;
+
+            recipes.forEach((recipe, idx) => {
+                const isSaved = savedRecipes.some(r => r.title === recipe.title);
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-orange-500/50 rounded-3xl p-5 space-y-3 shadow-sm transition-all duration-300';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 text-[10px] font-bold">
+                            ${recipe.difficulty || 'Praktis'}
+                        </span>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
+                                <i data-lucide="clock" class="w-3.5 h-3.5 text-orange-500"></i> ${recipe.timeMinutes} Mnt
+                            </span>
+                            <button onclick="toggleSaveRecipe(${idx})" class="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-orange-500 transition-all">
+                                <i data-lucide="bookmark" class="w-4 h-4 ${isSaved ? 'text-orange-500 fill-orange-500' : ''}"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <h3 class="font-extrabold text-slate-900 dark:text-white text-base leading-snug">${recipe.title}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2">${recipe.description}</p>
+
+                    <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                        <span class="text-slate-500 dark:text-slate-400"><strong class="text-slate-800 dark:text-white">${recipe.ingredientsUsed ? recipe.ingredientsUsed.length : 3}</strong> Bahan utama</span>
+                        <span class="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                            <i data-lucide="flame" class="w-3.5 h-3.5"></i> ${recipe.calories || 320} Kal
+                        </span>
+                    </div>
+
+                    <button onclick="openCookingModal(${idx})" class="w-full py-3 bg-slate-900 dark:bg-slate-800 hover:bg-orange-500 dark:hover:bg-orange-500 text-white rounded-2xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 touch-active">
+                        <i data-lucide="play" class="w-4 h-4 text-orange-400"></i>
+                        <span>Mulai Memasak / Baking</span>
+                    </button>
+                `;
+                recipesContainer.appendChild(card);
+            });
+
+            recipesContainer.classList.remove('hidden');
+            lucide.createIcons();
+        }
+        function renderFallbackRecipes() {
+            let fallback = [];
+            if (selectedTargetType === 'pastry') {
+                fallback = [{
+                    title: "Pancake Lembut Sederhana (Tanpa Mixer)",
+                    description: "Pancake empuk dan mengembang sempurna hanya menggunakan kocokan tangan.",
+                    timeMinutes: 20,
+                    calories: 280,
+                    difficulty: "Pemula",
+                    ingredientsUsed: ["Tepung Terigu", "Telur", "Mentega / Margarin", "Gula Pasir"],
+                    missingIngredients: ["Susu Cair", "Baking Powder"],
+                    substitutions: "Gula pasir bisa diganti madu, susu cair bisa diganti air biasa + krimer.",
+                    steps: [
+                        "Campurkan tepung terigu, gula, dan baking powder dalam wadah.",
+                        "Kocok telur dan susu cair di mangkuk terpisah, lalu tuangkan ke adonan kering.",
+                        "Aduk perlahan menggunakan wisker hingga tidak ada gumpalan.",
+                        "Panaskan teflon dengan api kecil, tuang 1 sendok sayur adonan.",
+                        "Balik saat muncul gelembung-gelembung kecil, masak hingga kecokelatan lalu sajikan."
+                    ]
+                }];
+            } else {
+                fallback = [{
+                    title: "Nasi Goreng Bumbu Cincang",
+                    description: "Nasi goreng lezat dengan bumbu bawang rumahan.",
+                    timeMinutes: 15,
+                    calories: 410,
+                    difficulty: "Sangat Mudah",
+                    ingredientsUsed: selectedIngredients.slice(0, 3),
+                    missingIngredients: ["Minyak Goreng", "Garam"],
+                    substitutions: "Kecap manis bisa diganti saus tiram atau sedikit gula merah.",
+                    steps: [
+                        "Cincang halus bawang merah, bawang putih, dan cabai.",
+                        "Tumis bumbu hingga harum di atas wajan.",
+                        "Orak-arik telur hingga setengah matang.",
+                        "Masukkan nasi, beri garam dan kecap manis secukupnya. Aduk rata di atas api besar."
+                    ]
+                }];
+            }
+            generatedRecipes = fallback;
+            renderRecipeCards(fallback);
+        }
+        /* ==========================================================================
+           5. RESEP FAVORIT (BOOKMARK)
+           ========================================================================== */
+        window.toggleSaveRecipe = function(idx) {
+            const recipe = generatedRecipes[idx];
+            const existingIdx = savedRecipes.findIndex(r => r.title === recipe.title);
+
+            if (existingIdx > -1) {
+                savedRecipes.splice(existingIdx, 1);
+                showToast("Resep dihapus dari favorit.");
+            } else {
+                savedRecipes.push(recipe);
+                showToast("Resep disimpan ke favorit ❤️");
+            }
+
+            localStorage.setItem('dapur_saved_recipes', JSON.stringify(savedRecipes));
+            renderRecipeCards(generatedRecipes);
+        };
+
+        function renderSavedRecipes() {
+            savedRecipesContainer.innerHTML = '';
+            if (savedRecipes.length === 0) {
+                savedRecipesContainer.appendChild(emptySavedMsg);
+                return;
+            }
+
+            savedRecipes.forEach((recipe, idx) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-sm';
+                card.innerHTML = `
+                    <div class="space-y-1 max-w-[220px]">
+                        <h4 class="font-bold text-xs text-slate-900 dark:text-white truncate">${recipe.title}</h4>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400">${recipe.timeMinutes} Mnt • ${recipe.difficulty}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="openSavedCookingModal(${idx})" class="px-3 py-1.5 bg-orange-500 text-white font-bold text-xs rounded-xl">
+                            Buka
+                        </button>
+                        <button onclick="removeSavedRecipe(${idx})" class="p-1.5 text-rose-500 font-bold">&times;</button>
+                    </div>
+                `;
+                savedRecipesContainer.appendChild(card);
+            });
+        }
+
+        window.openSavedCookingModal = function(idx) {
+            generatedRecipes = savedRecipes;
+            openCookingModal(idx);
+        };
+
+        window.removeSavedRecipe = function(idx) {
+            savedRecipes.splice(idx, 1);
+            localStorage.setItem('dapur_saved_recipes', JSON.stringify(savedRecipes));
+            renderSavedRecipes();
+        };
+
+        document.getElementById('btn-clear-saved').addEventListener('click', () => {
+            savedRecipes = [];
+            localStorage.setItem('dapur_saved_recipes', JSON.stringify(savedRecipes));
+            renderSavedRecipes();
+        });
+        /* ==========================================================================
+           6. MODAL MEMASAK INTERAKTIF
+           ========================================================================== */
+        window.openCookingModal = function(idx) {
+            currentRecipe = generatedRecipes[idx];
+            currentStepIndex = 0;
+
+            modalRecipeTitle.innerText = currentRecipe.title;
+            modalTime.innerText = `${currentRecipe.timeMinutes} Mnt`;
+            modalCalories.innerText = `${currentRecipe.calories} Kalori`;
+            modalDifficulty.innerText = currentRecipe.difficulty;
+
+            // Substitusi
+            if (currentRecipe.substitutions) {
+                modalSubstitutionsText.innerText = currentRecipe.substitutions;
+                modalSubstitutionsBox.classList.remove('hidden');
+            } else {
+                modalSubstitutionsBox.classList.add('hidden');
+            }
+
+            modalIngredientsList.innerHTML = '';
+            const allIngs = [...(currentRecipe.ingredientsUsed || []), ...(currentRecipe.missingIngredients || [])];
+            allIngs.forEach(ing => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-1.5';
+                li.innerHTML = `<i data-lucide="check-circle2" class="w-3.5 h-3.5 text-orange-500"></i> ${ing}`;
+                modalIngredientsList.appendChild(li);
+            });
+
+            updateStepView();
+            modalCooking.classList.remove('hidden');
+            lucide.createIcons();
+        };
+
+        function updateStepView() {
+            if (!currentRecipe || !currentRecipe.steps) return;
+            const total = currentRecipe.steps.length;
+            stepCounterLabel.innerText = `Langkah ${currentStepIndex + 1} dari ${total}`;
+            modalStepText.innerText = currentRecipe.steps[currentStepIndex];
+
+            btnPrevStep.disabled = currentStepIndex === 0;
+            btnNextStep.innerText = currentStepIndex === total - 1 ? "Selesai! 🎉" : "Lanjut \u2192";
+        }
+
+        btnPrevStep.addEventListener('click', () => {
+            if (currentStepIndex > 0) {
+                currentStepIndex--;
+                updateStepView();
+            }
+        });
+
+        btnNextStep.addEventListener('click', () => {
+            if (currentRecipe && currentStepIndex < currentRecipe.steps.length - 1) {
+                currentStepIndex++;
+                updateStepView();
+            } else {
+                modalCooking.classList.add('hidden');
+                showToast("Selamat! Kreasi kuliner Anda siap disajikan!");
+            }
+        });
+
+        btnCloseCooking.addEventListener('click', () => modalCooking.classList.add('hidden'));
+
+        btnSpeakStep.addEventListener('click', () => {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const text = modalStepText.innerText;
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'id-ID';
+                window.speechSynthesis.speak(utterance);
+                showToast("Membacakan instruksi...");
+            } else {
+                showToast("Browser Anda tidak mendukung fitur suara.");
+            }
+        });
+
+        btnStartTimer.addEventListener('click', () => {
+            clearInterval(timerInterval);
+            let sec = 180;
+            btnStartTimer.disabled = true;
+
+            timerInterval = setInterval(() => {
+                sec--;
+                const m = Math.floor(sec / 60).toString().padStart(2, '0');
+                const s = (sec % 60).toString().padStart(2, '0');
+                timerDisplay.innerText = `${m}:${s}`;
+
+                if (sec <= 0) {
+                    clearInterval(timerInterval);
+                    btnStartTimer.disabled = false;
+                    timerDisplay.innerText = "00:00";
+                    showToast("Timer memasak selesai!");
+                }
+            }, 1000);
+        });
+        /* ==========================================================================
+           7. DAFTAR BELANJA (SHOPPING LIST)
+           ========================================================================== */
+        const inputShoppingItem = document.getElementById('input-shopping-item');
+        const btnAddShopping = document.getElementById('btn-add-shopping');
+        const shoppingListItems = document.getElementById('shopping-list-items');
+        const emptyShoppingMsg = document.getElementById('empty-shopping-msg');
+        const btnClearShopping = document.getElementById('btn-clear-shopping');
+
+        function renderShoppingList() {
+            shoppingListItems.innerHTML = '';
+            if (shoppingItems.length === 0) {
+                shoppingListItems.appendChild(emptyShoppingMsg);
+                return;
+            }
+
+            shoppingItems.forEach((item, idx) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-slate-200';
+                li.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" class="w-4 h-4 accent-orange-500 rounded cursor-pointer">
+                        <span class="font-medium">${item}</span>
+                    </div>
+                    <button onclick="removeShoppingItem(${idx})" class="text-slate-400 hover:text-rose-500 font-bold">&times;</button>
+                `;
+                shoppingListItems.appendChild(li);
+            });
+        }
+
+        btnAddShopping.addEventListener('click', () => {
+            const val = inputShoppingItem.value.trim();
+            if (val) {
+                shoppingItems.push(val);
+                inputShoppingItem.value = '';
+                localStorage.setItem('dapur_shopping_items', JSON.stringify(shoppingItems));
+                renderShoppingList();
+            }
+        });
+
+        window.removeShoppingItem = function(idx) {
+            shoppingItems.splice(idx, 1);
+            localStorage.setItem('dapur_shopping_items', JSON.stringify(shoppingItems));
+            renderShoppingList();
+        };
+
+        btnClearShopping.addEventListener('click', () => {
+            shoppingItems = [];
+            localStorage.setItem('dapur_shopping_items', JSON.stringify(shoppingItems));
+            renderShoppingList();
+        });
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('translate-y-10', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-10', 'opacity-0'), 3000);
+        }
+    
+        // Init
+        initTheme();
+        renderChips();
+        renderShoppingList();
+    </script>
+</body>
+</html>
