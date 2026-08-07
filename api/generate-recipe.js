@@ -1,11 +1,9 @@
 /**
  * Serverless Backend Proxy Vercel
  * Path: api/generate-recipe.js
- * Fitur: Safe JSON Response Header, Top-Level Error Handling & Dynamic Model Discovery
  */
 
 module.exports = async function handler(req, res) {
-    // 1. Setel Header Wajib (JSON & CORS) agar Vercel tidak merespon dengan HTML
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -20,16 +18,14 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        // 2. Ambil Kunci API
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
             return res.status(500).json({ 
-                error: 'GEMINI_API_KEY belum terpasang di Vercel Settings -> Environment Variables.' 
+                error: 'GEMINI_API_KEY belum terpasang di Vercel Settings -> Environment Variables. Jangan lupa sertakan Redeploy setelah memasang!' 
             });
         }
 
-        // 3. Parsing Body Request secara Aman
         let bodyData = req.body;
         if (typeof bodyData === 'string') {
             try {
@@ -77,34 +73,54 @@ Format skema JSON wajib:
 ]
 `;
 
-        // 4. Deteksi Model Otomatis dari Google AI Studio
-        let selectedModelPath = "models/gemini-2.5-flash"; // Default fallback
-        try {
-            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-            if (listRes.ok) {
-                const listData = await listRes.json();
-                const validModels = (listData.models || []).filter(m => 
-                    m.supportedGenerationMethods && 
-                    m.supportedGenerationMethods.includes("generateContent")
-                );
-                if (validModels.length > 0) {
-                    const flashModel = validModels.find(m => m.name.includes("flash"));
-                    selectedModelPath = flashModel ? flashModel.name : validModels[0].name;
-                }
-            }
-        } catch (e) {
-            console.warn("Autodetect model warning:", e.message);
-        }
-
-        // 5. Pemanggilan Gemini API
-        const cleanModelPath = selectedModelPath.replace(/^models\//, '');
-        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelPath}:generateContent?key=${apiKey}`;
+        // Panggilan langsung ke Gemini API menggunakan model flash resmi
+        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
         const payload = {
             contents: [{ parts: [{ text: promptText }] }],
             generationConfig: {
                 temperature: 0.7,
                 responseMimeType: "application/json"
+            }
+        };
+
+        const apiRes = await fetch(generateUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const rawApiText = await apiRes.text();
+
+        if (!apiRes.ok) {
+            return res.status(apiRes.status).json({
+                error: `Error Google AI Studio (${apiRes.status}): ${rawApiText}`
+            });
+        }
+
+        let parsedApiData;
+        try {
+            parsedApiData = JSON.parse(rawApiText);
+        } catch (e) {
+            return res.status(500).json({ error: 'Respon dari Google AI bukan JSON valid.' });
+        }
+
+        const rawText = parsedApiData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (rawText) {
+            const cleanedText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const finalRecipes = JSON.parse(cleanedText);
+            return res.status(200).json(finalRecipes);
+        } else {
+            return res.status(500).json({ error: 'Hasil masakan dari AI kosong.' });
+        }
+
+    } catch (topErr) {
+        return res.status(500).json({
+            error: `Serverless Function Error: ${topErr.message || 'Terjadi kesalahan sistem internal.'}`
+        });
+    }
+};                responseMimeType: "application/json"
             }
         };
 
