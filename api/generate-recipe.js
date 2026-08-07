@@ -1,10 +1,10 @@
 /**
- * Serverless Backend Proxy untuk Vercel
+ * Serverless Backend Proxy untuk Vercel (CommonJS Native)
  * Path: api/generate-recipe.js
  */
 
-export default async function handler(req, res) {
-    // 1. Izinkan metode POST
+module.exports = async function handler(req, res) {
+    // 1. Izinkan penanganan Preflight CORS & Method Check
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
         });
     }
 
-    // 3. Parsing data request
+    // 3. Parsing data request body
     let bodyData = req.body;
     if (typeof bodyData === 'string') {
         try {
@@ -99,4 +99,4 @@ export default async function handler(req, res) {
     } catch (err) {
         return res.status(500).json({ error: `Serverless Proxy Exception: ${err.message}` });
     }
-}
+};
