@@ -1,6 +1,7 @@
 /**
  * Serverless Backend Proxy untuk Vercel (CommonJS Native)
  * Path: api/generate-recipe.js
+ * Model: gemini-1.5-flash (v1 API Endpoint)
  */
 
 module.exports = async function handler(req, res) {
@@ -59,8 +60,8 @@ module.exports = async function handler(req, res) {
     ]
     `;
 
-    // Endpoint menggunakan nama model resmi yang aktif (gemini-2.5-flash)
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Menggunakan endpoint v1 resmi (versi stabil produksi)
+    const endpoint = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const payload = {
         contents: [{ parts: [{ text: userPrompt }] }],
@@ -91,7 +92,7 @@ module.exports = async function handler(req, res) {
             const parsedData = JSON.parse(textContent);
             return res.status(200).json(parsedData);
         } else {
-            return res.status(500).json({ error: 'Respon dari AI kosong.' });
+            return res.status(500).json({ error: 'Respon dari AI kosong atau format tidak sesuai.' });
         }
     } catch (err) {
         return res.status(500).json({ error: `Serverless Proxy Exception: ${err.message}` });
