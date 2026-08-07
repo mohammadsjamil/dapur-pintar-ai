@@ -639,17 +639,28 @@
 
     try {
         const response = await fetch('/api/generate-recipe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ingredients: selectedIngredients,
-                targetType: selectedTargetType,
-                equipment: equipment,
-                level: level
-            })
-        });
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        ingredients: selectedIngredients,
+        targetType: selectedTargetType,
+        equipment: equipment,
+        level: level
+    })
+});
 
-        const resultData = await response.json();
+const responseText = await response.text();
+let resultData;
+
+try {
+    resultData = JSON.parse(responseText);
+} catch (e) {
+    throw new Error(`Respon server tidak valid (${response.status}). Mohon pastikan GEMINI_API_KEY sudah terpasang di Vercel Settings.`);
+}
+
+if (!response.ok) {
+    throw new Error(resultData.error || `Error ${response.status}`);
+}
 
         if (!response.ok) {
             throw new Error(resultData.error || `Error ${response.status}`);
