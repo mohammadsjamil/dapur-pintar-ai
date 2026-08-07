@@ -1,11 +1,10 @@
 /**
  * Serverless Backend Proxy untuk Vercel (CommonJS Native)
  * Path: api/generate-recipe.js
- * Fitur: Multi-Model Fallback + Exponential Backoff Retry + Nilai Gizi
+ * Fitur: Deteksi Model Otomatis (Dynamic Model Discovery) & Nilai Gizi
  */
 
 module.exports = async function handler(req, res) {
-    // 1. Handling CORS Preflight & Method Check
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
@@ -14,7 +13,6 @@ module.exports = async function handler(req, res) {
         return res.status(405).json({ error: 'Metode tidak diizinkan. Gunakan POST.' });
     }
 
-    // 2. Ambil Kunci API dari Environment Variable Vercel
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
@@ -23,7 +21,6 @@ module.exports = async function handler(req, res) {
         });
     }
 
-    // 3. Parsing Request Body
     let bodyData = req.body;
     if (typeof bodyData === 'string') {
         try {
@@ -39,10 +36,10 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'Harap sertakan minimal 1 bahan makanan.' });
     }
 
-    // 4. Susun System & User Prompt dengan Skema Nilai Gizi
-    const systemPrompt = `Anda adalah koki profesional Nusantara, Pastry Chef, dan Ahli Gizi Kuliner. Tugas Anda adalah meracik 3 ide resep masakan, cake, pastry, atau dessert berkualitas tinggi berbasis bahan yang tersedia, lengkap dengan estimasi nilai gizi per porsi.`;
+    const promptText = `
+Anda adalah koki profesional Nusantara, Pastry Chef, dan Ahli Gizi Kuliner.
+Tugas Anda: Buatkan 3 ide resep masakan, cake, pastry, atau dessert berkualitas tinggi berbasis bahan yang tersedia berikut, LENGKAP dengan estimasi nilai gizi per porsinya.
 
-    const userPrompt = `
 Bahan tersedia: ${ingredients.join(', ')}
 Kategori Target Olahan: ${targetType || 'masakan'} (Pilihan: masakan, pastry, dessert, snack)
 Peralatan tersedia: ${equipment || 'lengkap'}
@@ -71,40 +68,78 @@ Format skema JSON:
 ]
 `;
 
-    // 5. Daftar endpoint & skema payload yang kompatibel secara lintas versi
-    const endpointsToTry = [
-        {
-            url: `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-            payload: {
-                contents: [{ parts: [{ text: userPrompt }] }],
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-                generationConfig: { responseMimeType: "application/json", temperature: 0.7 }
-            }
-        },
-        {
-            url: `https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
-            payload: {
-                contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-                generationConfig: { responseMimeType: "application/json", temperature: 0.7 }
-            }
-        },
-        {
-            url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-            payload: {
-                contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-                generationConfig: { responseMimeType: "application/json", temperature: 0.7 }
-            }
-        },
-        {
-            url: `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-            payload: {
-                contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }]
-            }
+    try {
+        // 1. DETEKSI OTOMATIS MODEL YANG TERSEDIA DARI GOOGLE AI STUDIO (ListModels)
+        const listModelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        const listRes = await fetch(listModelsUrl);
+
+        if (!listRes.ok) {
+            const errText = await listRes.text();
+            return res.status(listRes.status).json({
+                error: `API Key bermasalah atau gagal mengambil daftar model dari Google AI Studio (${listRes.status}): ${errText}`
+            });
         }
-    ];
 
-    let errorLogs = [];
+        const listData = await listRes.json();
+        const availableModels = listData.models || [];
 
+        // Filter model yang mendukung metode 'generateContent'
+        const validModels = availableModels.filter(m => 
+            m.supportedGenerationMethods && 
+            m.supportedGenerationMethods.includes("generateContent")
+        );
+
+        if (validModels.length === 0) {
+            return res.status(404).json({
+                error: "API Key Anda aktif, tetapi tidak ditemukan model Gemini yang mendukung 'generateContent'."
+            });
+        }
+
+        // Cari model 'flash' terbaik dari daftar resmi akun Anda, jika tidak ada gunakan model pertama yang valid
+        const selectedModelObj = validModels.find(m => m.name.includes("flash")) || validModels[0];
+        const selectedModelPath = selectedModelObj.name; // Contoh: "models/gemini-2.5-flash" atau "models/gemini-1.5-flash"
+
+        // 2. EKSEKUSI PEMANGGILAN MODEL TERPILIH SECARA DINAMIS
+        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${selectedModelPath}:generateContent?key=${apiKey}`;
+
+        const payload = {
+            contents: [
+                { parts: [{ text: promptText }] }
+            ],
+            generationConfig: {
+                temperature: 0.7,
+                responseMimeType: "application/json"
+            }
+        };
+
+        const apiRes = await fetch(generateUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!apiRes.ok) {
+            const errText = await apiRes.text();
+            return res.status(apiRes.status).json({
+                error: `Error saat memanggil model terdeteksi (${selectedModelPath}): ${errText}`
+            });
+        }
+
+        const data = await apiRes.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (rawText) {
+            const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsedJson = JSON.parse(cleanedText);
+            return res.status(200).json(parsedJson);
+        } else {
+            return res.status(500).json({ error: 'Respon dari AI kosong.' });
+        }
+
+    } catch (err) {
+        return res.status(500).json({ error: `Serverless Proxy Exception: ${err.message}` });
+    }
+};
     // 6. Percobaan Endpoint + Exponential Backoff Retry (Max 5 kali per endpoint untuk error sementara)
     for (const item of endpointsToTry) {
         let delay = 1000; // Penundaan awal 1 detik
