@@ -1,42 +1,51 @@
 /**
- * Serverless Backend Proxy untuk Vercel (CommonJS Native)
+ * Serverless Backend Proxy Vercel
  * Path: api/generate-recipe.js
- * Fitur: Deteksi Model Otomatis (Dynamic Model Discovery) & Nilai Gizi
+ * Fitur: Safe JSON Response Header, Top-Level Error Handling & Dynamic Model Discovery
  */
 
 module.exports = async function handler(req, res) {
+    // 1. Setel Header Wajib (JSON & CORS) agar Vercel tidak merespon dengan HTML
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        return res.status(200).json({ ok: true });
     }
     
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Metode tidak diizinkan. Gunakan POST.' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    try {
+        // 2. Ambil Kunci API
+        const apiKey = process.env.GEMINI_API_KEY;
 
-    if (!apiKey) {
-        return res.status(500).json({ 
-            error: 'GEMINI_API_KEY tidak ditemukan di Vercel Settings -> Environment Variables.' 
-        });
-    }
-
-    let bodyData = req.body;
-    if (typeof bodyData === 'string') {
-        try {
-            bodyData = JSON.parse(bodyData);
-        } catch (e) {
-            bodyData = {};
+        if (!apiKey) {
+            return res.status(500).json({ 
+                error: 'GEMINI_API_KEY belum terpasang di Vercel Settings -> Environment Variables.' 
+            });
         }
-    }
 
-    const { ingredients, targetType, equipment, level } = bodyData || {};
+        // 3. Parsing Body Request secara Aman
+        let bodyData = req.body;
+        if (typeof bodyData === 'string') {
+            try {
+                bodyData = JSON.parse(bodyData);
+            } catch (e) {
+                bodyData = {};
+            }
+        }
 
-    if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
-        return res.status(400).json({ error: 'Harap sertakan minimal 1 bahan makanan.' });
-    }
+        const { ingredients, targetType, equipment, level } = bodyData || {};
 
-    const promptText = `
+        if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
+            return res.status(400).json({ error: 'Harap sertakan minimal 1 bahan makanan.' });
+        }
+
+        const promptText = `
 Anda adalah koki profesional Nusantara, Pastry Chef, dan Ahli Gizi Kuliner.
 Tugas Anda: Buatkan 3 ide resep masakan, cake, pastry, atau dessert berkualitas tinggi berbasis bahan yang tersedia berikut, LENGKAP dengan estimasi nilai gizi per porsinya.
 
@@ -46,7 +55,7 @@ Peralatan tersedia: ${equipment || 'lengkap'}
 Tingkat kesulitan: ${level || 'pemula'}
 
 SANGAT PENTING: Berikan balasan HANYA berupa array JSON valid berisi 3 resep tanpa teks pembuka/penutup atau pemformatan markdown tambahan.
-Format skema JSON:
+Format skema JSON wajib:
 [
   {
     "title": "Nama Masakan/Pastry",
@@ -68,43 +77,75 @@ Format skema JSON:
 ]
 `;
 
-    try {
-        // 1. DETEKSI OTOMATIS MODEL YANG TERSEDIA DARI GOOGLE AI STUDIO (ListModels)
-        const listModelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-        const listRes = await fetch(listModelsUrl);
-
-        if (!listRes.ok) {
-            const errText = await listRes.text();
-            return res.status(listRes.status).json({
-                error: `API Key bermasalah atau gagal mengambil daftar model dari Google AI Studio (${listRes.status}): ${errText}`
-            });
+        // 4. Deteksi Model Otomatis dari Google AI Studio
+        let selectedModelPath = "models/gemini-2.5-flash"; // Default fallback
+        try {
+            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+            if (listRes.ok) {
+                const listData = await listRes.json();
+                const validModels = (listData.models || []).filter(m => 
+                    m.supportedGenerationMethods && 
+                    m.supportedGenerationMethods.includes("generateContent")
+                );
+                if (validModels.length > 0) {
+                    const flashModel = validModels.find(m => m.name.includes("flash"));
+                    selectedModelPath = flashModel ? flashModel.name : validModels[0].name;
+                }
+            }
+        } catch (e) {
+            console.warn("Autodetect model warning:", e.message);
         }
 
-        const listData = await listRes.json();
-        const availableModels = listData.models || [];
-
-        // Filter model yang mendukung metode 'generateContent'
-        const validModels = availableModels.filter(m => 
-            m.supportedGenerationMethods && 
-            m.supportedGenerationMethods.includes("generateContent")
-        );
-
-        if (validModels.length === 0) {
-            return res.status(404).json({
-                error: "API Key Anda aktif, tetapi tidak ditemukan model Gemini yang mendukung 'generateContent'."
-            });
-        }
-
-        // Cari model 'flash' terbaik dari daftar resmi akun Anda, jika tidak ada gunakan model pertama yang valid
-        const selectedModelObj = validModels.find(m => m.name.includes("flash")) || validModels[0];
-        const selectedModelPath = selectedModelObj.name; // Contoh: "models/gemini-2.5-flash" atau "models/gemini-1.5-flash"
-
-        // 2. EKSEKUSI PEMANGGILAN MODEL TERPILIH SECARA DINAMIS
-        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${selectedModelPath}:generateContent?key=${apiKey}`;
+        // 5. Pemanggilan Gemini API
+        const cleanModelPath = selectedModelPath.replace(/^models\//, '');
+        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelPath}:generateContent?key=${apiKey}`;
 
         const payload = {
-            contents: [
-                { parts: [{ text: promptText }] }
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+                temperature: 0.7,
+                responseMimeType: "application/json"
+            }
+        };
+
+        const apiRes = await fetch(generateUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const rawApiText = await apiRes.text();
+
+        if (!apiRes.ok) {
+            return res.status(apiRes.status).json({
+                error: `Error dari Gemini API (${apiRes.status}): ${rawApiText}`
+            });
+        }
+
+        let parsedApiData;
+        try {
+            parsedApiData = JSON.parse(rawApiText);
+        } catch (e) {
+            return res.status(500).json({ error: 'Respon dari Google AI bukan JSON valid.' });
+        }
+
+        const rawText = parsedApiData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (rawText) {
+            const cleanedText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const finalRecipes = JSON.parse(cleanedText);
+            return res.status(200).json(finalRecipes);
+        } else {
+            return res.status(500).json({ error: 'Hasil masakan dari AI kosong.' });
+        }
+
+    } catch (topErr) {
+        // Mencegah Vercel mengirimkan halaman HTML Error 500
+        return res.status(500).json({
+            error: `Serverless Function Error: ${topErr.message || 'Terjadi kesalahan sistem internal.'}`
+        });
+    }
+};                { parts: [{ text: promptText }] }
             ],
             generationConfig: {
                 temperature: 0.7,
