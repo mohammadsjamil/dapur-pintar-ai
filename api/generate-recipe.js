@@ -1,47 +1,62 @@
 /**
- * Serverless Backend Proxy for DapurPintar AI
- * Endpoint: POST /api/generate-recipe
+ * Serverless Backend Proxy untuk Vercel
+ * Path: api/generate-recipe.js
  */
 
 export default async function handler(req, res) {
-    // 1. Batasi hanya menerima metode POST
+    // 1. Izinkan metode POST
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Metode tidak diizinkan. Gunakan POST.' });
     }
 
-    // 2. Ambil Gemini API Key secara aman dari variabel lingkungan server
+    // 2. Ambil GEMINI_API_KEY dari Environment Variable Vercel
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
         return res.status(500).json({ 
-            error: 'Server Misconfiguration: GEMINI_API_KEY tidak ditemukan di Environment Variable server.' 
+            error: 'GEMINI_API_KEY tidak ditemukan di Vercel Environment Variables. Harap tambahkan di Vercel Settings.' 
         });
     }
 
-    // 3. Validasi input payload
-    const { ingredients, timePref, stylePref } = req.body || {};
-
-    if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
-        return res.status(400).json({ error: 'Harap kirimkan daftar bahan makanan minimal 1 item.' });
+    // 3. Parsing data request
+    let bodyData = req.body;
+    if (typeof bodyData === 'string') {
+        try {
+            bodyData = JSON.parse(bodyData);
+        } catch (e) {
+            bodyData = {};
+        }
     }
 
-    const systemPrompt = `Anda adalah koki profesional Nusantara. Tugas Anda adalah meracik 3 ide resep masakan berbasis bahan kulkas pengguna dalam Bahasa Indonesia.`;
+    const { ingredients, targetType, equipment, level } = bodyData || {};
+
+    if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
+        return res.status(400).json({ error: 'Harap sertakan minimal 1 bahan makanan.' });
+    }
+
+    const systemPrompt = `Anda adalah koki profesional Nusantara & Pastry Chef ahli. Tugas Anda adalah meracik 3 ide resep masakan/kue berbasis bahan kulkas pengguna dalam Bahasa Indonesia secara mendetail.`;
 
     const userPrompt = `
-    Bahan kulkas tersedia: ${ingredients.join(', ')}.
-    Durasi memasak: ${timePref || 'sedang'}.
-    Gaya hidangan: ${stylePref || 'rumahan'}.
+    Bahan tersedia: ${ingredients.join(', ')}.
+    Kategori Target Olahan: ${targetType || 'masakan'}.
+    Peralatan tersedia: ${equipment || 'lengkap'}.
+    Tingkat kesulitan: ${level || 'pemula'}.
 
-    Format jawaban HARUS dalam bentuk JSON array valid berisi 3 objek seperti contoh berikut:
+    Format jawaban HARUS berupa array JSON valid berisi 3 objek seperti skema ini:
     [
       {
-        "title": "Nama Masakan",
-        "description": "Deskripsi singkat cita rasa masakan",
-        "timeMinutes": 20,
-        "calories": 350,
-        "difficulty": "Mudah",
+        "title": "Nama Masakan/Pastry",
+        "description": "Deskripsi singkat cita rasa",
+        "timeMinutes": 25,
+        "calories": 310,
+        "difficulty": "Pemula",
         "ingredientsUsed": ["bahan1", "bahan2"],
-        "missingIngredients": ["bumbu tambahan jika ada"],
+        "missingIngredients": ["bumbu/bahan tambahan"],
+        "substitutions": "Informasi pengganti bahan jika ada yang kurang",
         "steps": ["Langkah 1...", "Langkah 2..."]
       }
     ]
@@ -57,49 +72,31 @@ export default async function handler(req, res) {
         }
     };
 
-    // 4. Mekanisme Exponential Backoff Retry untuk memanggil Gemini API
-    let delay = 1000;
-    let success = false;
-    let responseData = null;
+    // 4. Kirim request ke Gemini API
+    try {
+        const apiRes = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-    for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-            const apiRes = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+        if (!apiRes.ok) {
+            const errBody = await apiRes.text();
+            return res.status(apiRes.status).json({ 
+                error: `Error dari Gemini API (${apiRes.status}): ${errBody}` 
             });
-
-            if (!apiRes.ok) {
-                throw new Error(`Gemini API HTTP Status ${apiRes.status}`);
-            }
-
-            const data = await apiRes.json();
-            const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (textContent) {
-                responseData = JSON.parse(textContent);
-                success = true;
-                break;
-            }
-        } catch (err) {
-            if (attempt === 4) {
-                console.error("Proxy Error Gemini Fetch:", err);
-                return res.status(502).json({ error: 'Gagal terhubung ke AI Service setelah beberapa kali percobaan.' });
-            }
-            await new Promise(r => setTimeout(r, delay));
-            delay *= 2;
         }
-    }
 
-    // 5. Kembalikan data resep berformat JSON ke frontend
-    if (success && responseData) {
-        // Keamanan Tambahan: Cache header 1 jam agar hemat kuota API
-        res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
-        return res.status(200).json(responseData);
-    } else {
-        return res.status(500).json({ error: 'Format keluaran dari AI tidak valid.' });
+        const data = await apiRes.json();
+        const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (textContent) {
+            const parsedData = JSON.parse(textContent);
+            return res.status(200).json(parsedData);
+        } else {
+            return res.status(500).json({ error: 'Respon dari AI kosong atau format tidak sesuai.' });
+        }
+    } catch (err) {
+        return res.status(500).json({ error: `Serverless Proxy Exception: ${err.message}` });
     }
 }
-
-  
