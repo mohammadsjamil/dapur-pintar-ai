@@ -3,29 +3,33 @@
  * Path: api/generate-recipe.js
  */
 
-module.exports = async function handler(req, res) {
-    res.setHeader('Content-Type', 'application/json');
+export default async function handler(req, res) {
+    // Setel Header CORS & Content-Type
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+    res.setHeader('Content-Type', 'application/json');
 
     if (req.method === 'OPTIONS') {
-        return res.status(200).json({ ok: true });
+        return res.status(200).end();
     }
-    
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Metode tidak diizinkan. Gunakan POST.' });
     }
 
     try {
-        const apiKey = process.env.GEMINI_API_KEY;
+        // 1. Cek GEMINI_API_KEY
+        const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : '';
 
         if (!apiKey) {
-            return res.status(500).json({ 
-                error: 'GEMINI_API_KEY belum terpasang di Vercel Settings -> Environment Variables. Jangan lupa sertakan Redeploy setelah memasang!' 
+            return res.status(400).json({
+                error: 'Variabel GEMINI_API_KEY belum terpasang di Vercel Settings -> Environment Variables. Pastikan Anda klik REDEPLOY setelah memasang key.'
             });
         }
 
+        // 2. Parse Body Request
         let bodyData = req.body;
         if (typeof bodyData === 'string') {
             try {
@@ -34,23 +38,23 @@ module.exports = async function handler(req, res) {
                 bodyData = {};
             }
         }
+        bodyData = bodyData || {};
 
-        const { ingredients, targetType, equipment, level } = bodyData || {};
+        const { ingredients = [], targetType = 'masakan', equipment = 'lengkap', level = 'pemula' } = bodyData;
 
-        if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
-            return res.status(400).json({ error: 'Harap sertakan minimal 1 bahan makanan.' });
+        if (!Array.isArray(ingredients) || ingredients.length === 0) {
+            return res.status(400).json({ error: 'Harap masukkan minimal 1 bahan makanan.' });
         }
 
-        const promptText = `
-Anda adalah koki profesional Nusantara, Pastry Chef, dan Ahli Gizi Kuliner.
-Tugas Anda: Buatkan 3 ide resep masakan, cake, pastry, atau dessert berkualitas tinggi berbasis bahan yang tersedia berikut, LENGKAP dengan estimasi nilai gizi per porsinya.
+        // 3. Prompt untuk Gemini 2.5 Flash
+        const systemPrompt = `Anda adalah koki profesional Nusantara, Pastry Chef, dan Ahli Gizi Kuliner. Tugas Anda adalah meracik 3 ide resep masakan, cake, pastry, atau dessert berkualitas tinggi berbasis bahan yang tersedia, lengkap dengan estimasi nilai gizi per porsi dalam Bahasa Indonesia.`;
 
-Bahan tersedia: ${ingredients.join(', ')}
-Kategori Target Olahan: ${targetType || 'masakan'} (Pilihan: masakan, pastry, dessert, snack)
-Peralatan tersedia: ${equipment || 'lengkap'}
-Tingkat kesulitan: ${level || 'pemula'}
+        const userPrompt = `Bahan tersedia: ${ingredients.join(', ')}.
+Kategori Target Olahan: ${targetType}.
+Peralatan tersedia: ${equipment}.
+Tingkat kesulitan: ${level}.
 
-SANGAT PENTING: Berikan balasan HANYA berupa array JSON valid berisi 3 resep tanpa teks pembuka/penutup atau pemformatan markdown tambahan.
+SANGAT PENTING: Berikan balasan HANYA berupa array JSON valid berisi 3 resep tanpa teks pembuka/penutup atau pemformatan markdown.
 Format skema JSON wajib:
 [
   {
@@ -70,41 +74,57 @@ Format skema JSON wajib:
     "substitutions": "Informasi pengganti bahan jika ada yang kurang",
     "steps": ["Langkah 1...", "Langkah 2..."]
   }
-]
-`;
+]`;
 
-        // Panggilan langsung ke Gemini API menggunakan model flash resmi
-        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        // 4. Request ke Endpoint Resmi Gemini 2.5 Flash
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-:generateContent?key=${apiKey}`;
 
         const payload = {
-            contents: [{ parts: [{ text: promptText }] }],
+            contents: [{ parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
             generationConfig: {
-                temperature: 0.7,
                 responseMimeType: "application/json"
             }
         };
 
-        const apiRes = await fetch(generateUrl, {
+        const apiRes = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
-        const rawApiText = await apiRes.text();
+        const rawText = await apiRes.text();
 
         if (!apiRes.ok) {
             return res.status(apiRes.status).json({
-                error: `Error Google AI Studio (${apiRes.status}): ${rawApiText}`
+                error: `Error dari Gemini API (${apiRes.status}): ${rawText}`
             });
         }
 
-        let parsedApiData;
+        let parsedData;
         try {
-            parsedApiData = JSON.parse(rawApiText);
+            parsedData = JSON.parse(rawText);
         } catch (e) {
-            return res.status(500).json({ error: 'Respon dari Google AI bukan JSON valid.' });
+            return res.status(500).json({ error: 'Respon dari Google Gemini bukan JSON valid.' });
         }
 
+        const textContent = parsedData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!textContent) {
+            return res.status(500).json({ error: 'Respon dari Gemini AI kosong.' });
+        }
+
+        const cleanedJson = textContent.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const recipes = JSON.parse(cleanedJson);
+
+        return res.status(200).json(recipes);
+
+    } catch (err) {
+        return res.status(500).json({
+            error: `Serverless Function Error: ${err.message}`
+        });
+    }
+}
         const rawText = parsedApiData.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (rawText) {
