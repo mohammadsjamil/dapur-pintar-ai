@@ -60,7 +60,7 @@ module.exports = async function handler(req, res) {
     `;
 
     // Endpoint menggunakan nama model resmi yang aktif (gemini-2.5-flash)
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const payload = {
         contents: [{ parts: [{ text: userPrompt }] }],
