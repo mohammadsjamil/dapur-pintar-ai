@@ -624,54 +624,52 @@
            4. PEMANGGILAN SERVERLESS BACKEND PROXY (GEMINI AI)
            ========================================================================== */
         async function fetchRecipesFromProxy() {
-            if (selectedIngredients.length === 0) {
-                showToast("Pilih minimal 1 bahan makanan!");
-                return;
-            }
+    if (selectedIngredients.length === 0) {
+        showToast("Pilih minimal 1 bahan makanan!");
+        return;
+    }
 
-            const equipment = document.getElementById('select-equipment').value;
-            const level = document.getElementById('select-level').value;
+    const equipment = document.getElementById('select-equipment').value;
+    const level = document.getElementById('select-level').value;
 
-            switchTab('recipes');
-            recipePlaceholder.classList.add('hidden');
-            recipesContainer.classList.add('hidden');
-            recipeLoader.classList.remove('hidden');
+    switchTab('recipes');
+    recipePlaceholder.classList.add('hidden');
+    recipesContainer.classList.add('hidden');
+    recipeLoader.classList.remove('hidden');
 
-            try {
-                // Request dikirimkan ke serverless backend proxy
-                const response = await fetch('/api/generate-recipe', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ingredients: selectedIngredients,
-                        targetType: selectedTargetType, // masakan / pastry / dessert / snack
-                        equipment: equipment,
-                        level: level
-                    })
-                });
+    try {
+        const response = await fetch('/api/generate-recipe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ingredients: selectedIngredients,
+                targetType: selectedTargetType,
+                equipment: equipment,
+                level: level
+            })
+        });
 
-                if (!response.ok) {
-                    const errData = await response.json().catch(() => ({}));
-                    throw new Error(errData.error || `Error Server ${response.status}`);
-                }
+        const resultData = await response.json();
 
-                const resultData = await response.json();
-                recipeLoader.classList.add('hidden');
-
-                if (Array.isArray(resultData) && resultData.length > 0) {
-                    generatedRecipes = resultData;
-                    renderRecipeCards(resultData);
-                } else {
-                    renderFallbackRecipes();
-                }
-            } catch (err) {
-                console.warn("Serverless backend belum dideploy atau offline, memakai fallback demo:", err);
-                recipeLoader.classList.add('hidden');
-                showToast("Mode Demo Offline (Deploy ke Vercel untuk AI Live)");
-                renderFallbackRecipes();
-            }
+        if (!response.ok) {
+            throw new Error(resultData.error || `Error ${response.status}`);
         }
 
+        recipeLoader.classList.add('hidden');
+
+        if (Array.isArray(resultData) && resultData.length > 0) {
+            generatedRecipes = resultData;
+            renderRecipeCards(resultData);
+        } else {
+            renderFallbackRecipes();
+        }
+    } catch (err) {
+        recipeLoader.classList.add('hidden');
+        // Tampilkan error asli langsung di Toast
+        showToast(`Gagal: ${err.message}`);
+        renderFallbackRecipes();
+    }
+}
         btnGenerateRecipe.addEventListener('click', fetchRecipesFromProxy);
 
         function renderRecipeCards(recipes) {
